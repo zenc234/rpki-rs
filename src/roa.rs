@@ -72,6 +72,11 @@ impl Roa {
     pub fn cert(&self) -> &Cert {
         self.signed.cert()
     }
+
+    /// Returns a reference to the RouteOriginAttestation content.
+    pub fn content(&self) -> &RouteOriginAttestation {
+        &self.content
+    }
 }
 
 
