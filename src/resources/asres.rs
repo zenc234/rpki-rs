@@ -13,13 +13,14 @@
 //! [RFC 3779]: https://tools.ietf.org/html/rfc3779
 //! [RFC 6487]: https://tools.ietf.org/html/rfc6487
 
-use std::{error, fmt, iter, ops};
+use std::{fmt, iter, ops};
 use std::cmp::Ordering;
 use std::iter::FromIterator;
 use std::str::FromStr;
 use bcder::{decode, encode};
 use bcder::{Tag, xerr};
 use bcder::encode::PrimitiveContent;
+use derive_more::{Display, From};
 use serde::de;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use crate::cert::Overclaim;
@@ -864,28 +865,17 @@ impl fmt::Display for AsId {
 
 //------------ FromStrError --------------------------------------------------
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Display, Eq, From, PartialEq)]
 pub enum FromStrError {
+    #[display(fmt="Bad AS number. Expected format: AS#")]
     BadAsn,
+
+    #[display(fmt="Bad AS range. Expected format: AS#-AS#")]
     BadRange,
+
+    #[display(fmt="Cannot parse blocks.")]
     BadBlocks,
 }
-
-impl fmt::Display for FromStrError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(match *self {
-            FromStrError::BadAsn
-                => "Bad AS number. Expected format: AS#",
-            FromStrError::BadRange
-                => "Bad AS range. Expected format: AS#-AS#",
-            FromStrError::BadBlocks
-                => "Cannot parse blocks."
-        })
-    }
-}
-
-impl error::Error for FromStrError { }
-
 
 //============ Tests =========================================================
 

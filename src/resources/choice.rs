@@ -2,8 +2,9 @@
 ///
 /// This is a private module used only internally.
 
-use std::{error, fmt};
+use std::fmt;
 use std::str::FromStr;
+use derive_more::Display;
 use serde::{Deserialize, Serialize};
 use crate::x509::ValidationError;
 
@@ -100,19 +101,8 @@ impl<T: FromStr> FromStr for ResourcesChoice<T> {
 
 //------------ FromStrError --------------------------------------------------
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Display, Eq, PartialEq)]
 pub enum FromStrErr {
+    #[display(fmt="Cannot parse blocks")]
     BlocksFromStr,
 }
-
-impl fmt::Display for FromStrErr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(match *self {
-            FromStrErr::BlocksFromStr
-                => "Cannot parse blocks"
-        })
-    }
-}
-
-impl error::Error for FromStrErr { }
-

@@ -1,6 +1,6 @@
 //! Types common to all things X.509.
 
-use std::{error, fmt, io, ops, str};
+use std::{fmt, io, ops, str};
 use std::cmp::{min, max};
 use std::str::FromStr;
 use std::time::SystemTime;
@@ -14,6 +14,7 @@ use bcder::encode::PrimitiveContent;
 use chrono::{
     Datelike, DateTime, Duration, LocalResult, Timelike, TimeZone, Utc
 };
+use derive_more::Display;
 use serde::de;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use crate::crypto::{
@@ -541,36 +542,18 @@ impl Time {
         Self::years_from_now(1)
     }
 
-    /// Adds number of years to the given date.
-    ///
-    /// If the given date happens to be a leap date,
-    /// the resulting date would be normalized to February 28.
-    ///
-    /// This is the case even if the resulting year is also a leap year.
-    pub fn years_from_date(years: i32, date: DateTime<Utc>) -> Self {
+    pub fn years_from_now(years: i32) -> Self {
+        let now = Utc::now();
 
-        let year = date.year();
-        let month = date.month();
+        let year = now.year();
+        let month = now.month();
+        let day = now.day();
 
-        let day = {
-            if date.day() == 29 && month == 2 { 28 } else { date.day() }
-        };
-
-        let hour = date.hour();
-        let min = date.minute();
-        let sec = std::cmp::min(date.second(), 59);
+        let hour = now.hour();
+        let min = now.minute();
+        let sec = now.second();
 
         Self::utc(year + years, month, day, hour, min, sec)
-    }
-
-    /// Adds given years to the current date.
-    ///
-    /// If current date happens to be a leap date,
-    /// the resulting date would be normalized to February 28.
-    ///
-    /// This is the case even if the resulting year is also a leap year.
-    pub fn years_from_now(years: i32) -> Self {
-        Self::years_from_date(years, Utc::now())
     }
 
     pub fn utc(
@@ -979,21 +962,15 @@ impl<'de> de::Visitor<'de> for SerialVisitor {
 //------------ RepresentationError -------------------------------------------
 
 /// A source value is not correctly formated for converting into a value.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
+#[display(fmt="wrong representation format")]
 pub struct RepresentationError;
-
-impl fmt::Display for RepresentationError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str("wrong representation format")
-    }
-}
-
-impl error::Error for RepresentationError { }
 
 
 //------------ ValidationError -----------------------------------------------
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
+#[display(fmt="validation error")]
 pub struct ValidationError;
 
 impl From<decode::Error> for ValidationError {
@@ -1008,14 +985,6 @@ impl From<VerificationError> for ValidationError {
     }
 }
 
-impl fmt::Display for ValidationError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str("validation error")
-    }
-}
-
-impl error::Error for ValidationError { }
-
 
 //------------ Testing. One. Two. Three --------------------------------------
 
@@ -1024,6 +993,7 @@ mod test {
     use super::*;
     use bcder::decode::Constructed;
     use bcder::encode::Values;
+    use unwrap::unwrap;
 
     #[test]
     fn signed_data_decode_then_encode() {
@@ -1038,7 +1008,7 @@ mod test {
     #[test]
     fn serial_from_slice() {
         assert_eq!(
-            Serial::from_slice(b"\x01\x02\x03").unwrap(),
+            unwrap!(Serial::from_slice(b"\x01\x02\x03")),
             Serial([0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,1,2,3])
         );
         assert_eq!(
@@ -1050,11 +1020,13 @@ mod test {
     #[test]
     fn serial_take_from() {
         assert_eq!(
-            Constructed::decode(
-                b"\x02\x03\x01\x02\x03".as_ref(),
-                Mode::Der,
-                Serial::take_from
-            ).unwrap(),
+            unwrap!(
+                Constructed::decode(
+                    b"\x02\x03\x01\x02\x03".as_ref(),
+                    Mode::Der,
+                    Serial::take_from
+                )
+            ),
             Serial([0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,1,2,3])
         );
     }
@@ -1062,20 +1034,20 @@ mod test {
     #[test]
     fn serial_from_str() {
         assert_eq!(
-            Serial::from_str("383822").unwrap(),
-            Serial::from_slice(b"\x05\xdb\x4e").unwrap()
+            unwrap!(Serial::from_str("383822")),
+            unwrap!(Serial::from_slice(b"\x05\xdb\x4e"))
         );
         assert_eq!(
-            Serial::from_str("000000383822").unwrap(),
-            Serial::from_slice(b"\x05\xdb\x4e").unwrap()
+            unwrap!(Serial::from_str("000000383822")),
+            unwrap!(Serial::from_slice(b"\x05\xdb\x4e"))
         );
         assert_eq!(
-            Serial::from_str("0").unwrap(),
-            Serial::from_slice(b"\0").unwrap()
+            unwrap!(Serial::from_str("0")),
+            unwrap!(Serial::from_slice(b"\0"))
         );
         assert_eq!(
-            Serial::from_str("17085962136030120322").unwrap(),
-            Serial::from_slice(b"\xed\x1d\x88\x09\x93\xd9\x89\x82").unwrap()
+            unwrap!(Serial::from_str("17085962136030120322")),
+            unwrap!(Serial::from_slice(b"\xed\x1d\x88\x09\x93\xd9\x89\x82"))
         );
         assert!(
             Serial::from_str(
@@ -1083,13 +1055,13 @@ mod test {
             ).is_err()
         );
         assert_eq!(
-            Serial::from_str(
+            unwrap!(Serial::from_str(
                 "000730750818665451459101842416358141509827966271487"
-            ).unwrap(),
-            Serial::from_slice(
+            )),
+            unwrap!(Serial::from_slice(
                 b"\x7f\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\
                   \xff\xff\xff\xff\xff\xff\xff\xff\xff"
-            ).unwrap()
+            ))
         );
         assert!(
             Serial::from_str(
@@ -1097,13 +1069,13 @@ mod test {
             ).is_err()
         );
         assert!(Serial::from_str("hello").is_err());
-        assert_eq!(Serial::from_str("0").unwrap(), Serial::default());
+        assert_eq!(unwrap!(Serial::from_str("0")), Serial::default());
     }
 
     #[test]
     fn string_from_serial() {
         assert_eq!(
-            String::from(Serial::from_slice(b"\x05\xdb\x4e").unwrap()),
+            String::from(unwrap!(Serial::from_slice(b"\x05\xdb\x4e"))),
             String::from("383822"),
         );
     }
@@ -1111,81 +1083,23 @@ mod test {
     #[test]
     fn serial_encode() {
         let mut target = Vec::new();
-        Serial([0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,1,2,3])
-            .encode().write_encoded(Mode::Der, &mut target).unwrap();
+        unwrap!(
+            Serial([0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,1,2,3])
+                .encode().write_encoded(Mode::Der, &mut target)
+        );
         assert_eq!(
             target,
             b"\x02\x03\x01\x02\x03"
         );
 
         let mut target = Vec::new();
-        Serial([0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0x81,2,3])
-            .encode().write_encoded(Mode::Der, &mut target).unwrap();
+        unwrap!(
+            Serial([0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0x81,2,3])
+                .encode().write_encoded(Mode::Der, &mut target)
+        );
         assert_eq!(
             target,
             b"\x02\x04\x00\x81\x02\x03"
-        );
-    }
-
-    #[test]
-    fn next_year() {
-        let now = DateTime::parse_from_rfc3339("2014-10-21T16:39:57-00:00").unwrap();
-        let future = Time::years_from_date(1, DateTime::from_utc(now.naive_utc(), Utc));
-
-        assert_eq!(
-            future.year(),
-            2015
-        );
-        assert_eq!(
-            future.month(),
-            10
-        );
-        assert_eq!(
-            future.day(),
-            21
-        );
-        assert_eq!(
-            future.hour(),
-            16
-        );
-        assert_eq!(
-            future.minute(),
-            39
-        );
-        assert_eq!(
-            future.second(),
-            57
-        );
-    }
-
-    #[test]
-    fn next_year_from_leap() {
-        let now = DateTime::parse_from_rfc3339("2020-02-29T16:39:57-00:00").unwrap();
-        let future = Time::years_from_date(10, DateTime::from_utc(now.naive_utc(), Utc));
-
-        assert_eq!(
-            future.year(),
-            2030
-        );
-        assert_eq!(
-            future.month(),
-            2
-        );
-        assert_eq!(
-            future.day(),
-            28
-        );
-        assert_eq!(
-            future.hour(),
-            16
-        );
-        assert_eq!(
-            future.minute(),
-            39
-        );
-        assert_eq!(
-            future.second(),
-            57
         );
     }
 }

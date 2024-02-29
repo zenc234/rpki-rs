@@ -119,7 +119,7 @@ impl DigestAlgorithm {
         cons: &mut decode::Constructed<S>
     ) -> Result<(), S::Err> {
         cons.take_constructed_if(Tag::SET, |cons| {
-            while Self::take_opt_from(cons)?.is_some() { }
+            while let Some(_) = Self::take_opt_from(cons)? { }
             Ok(())
         })
     }
@@ -157,11 +157,11 @@ impl DigestAlgorithm {
 //------------ Sha1 ----------------------------------------------------------
 
 pub fn sha1_digest(data: &[u8]) -> Digest {
-    digest::digest(&digest::SHA1_FOR_LEGACY_USE_ONLY, data)
+    digest::digest(&digest::SHA1, data)
 }
 
 pub fn start_sha1() -> Context {
-    Context(digest::Context::new(&digest::SHA1_FOR_LEGACY_USE_ONLY))
+    Context(digest::Context::new(&digest::SHA1))
 }
 
 

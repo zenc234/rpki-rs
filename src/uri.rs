@@ -1,12 +1,13 @@
 //! URIs.
 
-use std::{error, fmt, hash, io, str};
+use std::{fmt, hash, io, str};
 use std::convert::TryFrom;
 use std::str::FromStr;
 use bcder::encode;
 use bcder::{Mode, Tag};
 use bcder::encode::PrimitiveContent;
-use bytes::{Buf, BufMut, Bytes, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut};
+use derive_more::Display;
 use serde::de;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -42,7 +43,7 @@ impl Rsync {
     }
 
     pub fn from_slice(slice: &[u8]) -> Result<Self, Error> {
-        Self::from_bytes(Bytes::copy_from_slice(slice))
+        Self::from_bytes(slice.into())
     }
 
     pub fn from_bytes(mut bytes: Bytes) -> Result<Self, Error> {
@@ -81,17 +82,6 @@ impl Rsync {
         })
     }
 
-    /// Moves the URI to its own memory.
-    ///
-    /// Values use shared memory in order to allow cheap copying which may
-    /// result in large allocations being kept around longer than necessary.
-    /// This method moves the URI to a new memory location allowing the
-    /// previous location to potentially be freed.
-    pub fn unshare(&mut self) {
-        self.module.unshare();
-        self.path = Bytes::copy_from_slice(self.path.as_ref());
-    }
-
     fn check_path(path: &[u8]) -> Result<(), Error> {
         // Don’t allow ".." anywhere. Don’t allow empty segments except at the
         // end.
@@ -124,10 +114,6 @@ impl Rsync {
         self.module.clone()
     }
 
-    pub fn authority(&self) -> &str {
-        self.module.authority()
-    }
-
     pub fn path(&self) -> &str {
         unsafe { ::std::str::from_utf8_unchecked(self.path.as_ref()) }
     }
@@ -145,7 +131,7 @@ impl Rsync {
             }
             else {
                 res.path = self.path.slice(
-                    0..self.path.len() - tail - 1
+                    0, self.path.len() - tail - 1
                 );
             }
             Some(res)
@@ -219,7 +205,7 @@ impl str::FromStr for Rsync {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Error> {
-        Self::from_bytes(Bytes::copy_from_slice(s.as_ref()))
+        Self::from_bytes(Bytes::from(s))
     }
 }
 
@@ -298,18 +284,6 @@ impl RsyncModule {
         assert!(is_uri_ascii(module.as_ref()));
         RsyncModule { authority, module }
     }
-
-    /// Moves the value to its own memory.
-    ///
-    /// Values use shared memory in order to allow cheap copying which may
-    /// result in large allocations being kept around longer than necessary.
-    /// This method moves the URI to a new memory location allowing the
-    /// previous location to potentially be freed.
-    pub fn unshare(&mut self) {
-        self.authority = Bytes::copy_from_slice(self.authority.as_ref());
-        self.module = Bytes::copy_from_slice(self.module.as_ref());
-    }
-
 
     pub fn to_uri(&self) -> Rsync {
         Rsync {
@@ -392,7 +366,7 @@ impl Https {
     }
 
     pub fn from_slice(slice: &[u8]) -> Result<Self, Error> {
-        Self::from_bytes(Bytes::copy_from_slice(slice))
+        Self::from_bytes(slice.into())
     }
 
     pub fn from_bytes(bytes: Bytes) -> Result<Self, Error> {
@@ -409,22 +383,8 @@ impl Https {
         Ok(Https { uri: bytes, path_idx })
     }
 
-    /// Moves the URI to its own memory.
-    ///
-    /// Values use shared memory in order to allow cheap copying which may
-    /// result in large allocations being kept around longer than necessary.
-    /// This method moves the URI to a new memory location allowing the
-    /// previous location to potentially be freed.
-    pub fn unshare(&mut self) {
-        self.uri = Bytes::copy_from_slice(self.uri.as_ref());
-    }
-
     pub fn scheme(&self) -> Scheme {
         Scheme::Https
-    }
-
-    pub fn authority(&self) -> &str {
-        &self.as_str()[self.scheme().as_str().len() + 3..self.path_idx]
     }
 
     pub fn as_str(&self) -> &str {
@@ -497,7 +457,7 @@ impl str::FromStr for Https {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Error> {
-        Self::from_bytes(Bytes::copy_from_slice(s.as_ref()))
+        Self::from_bytes(Bytes::from(s))
     }
 }
 
@@ -697,29 +657,23 @@ pub fn is_uri_ascii<S: AsRef<[u8]>>(slice: S) -> bool {
 
 //------------ Error ---------------------------------------------------------
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
 pub enum Error {
+    #[display(fmt="invalid characters")]
     NotAscii,
+
+    #[display(fmt="bad URI")]
     BadUri,
+
+    #[display(fmt="bad URI scheme")]
     BadScheme,
+
+    #[display(fmt="URI with dot segments")]
     DotSegments,
+
+    #[display(fmt="URI with empty segments")]
     EmptySegments,
 }
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(match *self {
-            Error::NotAscii => "invalid characters",
-            Error::BadUri => "bad URI",
-            Error::BadScheme => "bad URI scheme",
-            Error::DotSegments => "URI with dot path segments",
-            Error::EmptySegments => "URI with emtpy path segments",
-        })
-    }
-}
-
-impl error::Error for Error { }
-
 
 
 //------------ Tests ---------------------------------------------------------
@@ -772,20 +726,6 @@ mod tests {
         assert_eq!(None, c.relative_to(&a));
         assert_eq!(None, a.relative_to(&a_b));
         assert_eq!(None, m2_a_b.relative_to(&a));
-    }
-
-    #[test]
-    fn https_authority() {
-        assert_eq!(
-            Https::from_str(
-                "https://example.com/some/stuff"
-            ).unwrap().authority(),
-            "example.com"
-        );
-        assert_eq!(
-            Https::from_str("https://example.com/",).unwrap().authority(),
-            "example.com"
-        );
     }
 
     #[test]

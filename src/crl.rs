@@ -482,7 +482,7 @@ impl RevokedCertificates {
     ) -> Result<Self, S::Err> {
         let res = cons.take_opt_sequence(|cons| {
             cons.capture(|cons| {
-                while CrlEntry::take_opt_from(cons)?.is_some() { }
+                while let Some(_) = CrlEntry::take_opt_from(cons)? { }
                 Ok(())
             })
         })?;

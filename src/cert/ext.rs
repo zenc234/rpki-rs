@@ -310,7 +310,7 @@ impl Extensions {
             let res = cons.take_sequence(|c| c.capture_all())?;
             res.clone().decode(|cons| {
                 Oid::skip_in(cons)?;
-                while Oid::skip_opt_in(cons)?.is_some() { }
+                while let Some(_) = Oid::skip_opt_in(cons)? { }
                 Ok(res)
             }).map_err(Into::into)
         })
@@ -535,7 +535,7 @@ pub struct KeyIdentifier(OctetString);
 impl KeyIdentifier {
     pub fn new(key_info: &PublicKey) -> Self {
         let ki = key_info.key_identifier();
-        let b = Bytes::copy_from_slice(ki.as_ref());
+        let b = Bytes::from(ki.as_ref());
         KeyIdentifier(OctetString::new(b))
     }
 
@@ -647,7 +647,7 @@ pub struct AuthorityKeyIdentifier {
 impl AuthorityKeyIdentifier {
     pub fn new(key_info: &PublicKey) -> Self {
         let ki = key_info.key_identifier();
-        let b = Bytes::copy_from_slice(ki.as_ref());
+        let b = Bytes::from(ki.as_ref());
 
         Self{authority_key_id: OctetString::new(b)}
     }

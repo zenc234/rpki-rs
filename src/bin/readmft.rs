@@ -1,6 +1,7 @@
 extern crate rpki;
 
 use std::{env, fs};
+use std::io::Read;
 use rpki::manifest::Manifest;
 
 
@@ -12,13 +13,19 @@ fn main() {
             return
         }
     };
-    let data = match fs::read(path) {
+    let mut file = match fs::File::open(path) {
         Ok(file) => file,
         Err(err) => {
-            println!("Can’t read file: {}", err);
+            println!("Can’t open file: {}", err);
             return;
         }
     };
+    let mut data = Vec::new();
+    if let Err(err) = file.read_to_end(&mut data) {
+        println!("Can’t read file: {}", err);
+        return;
+    }
+
     let _cert = match Manifest::decode(data.as_ref(), false) {
         Ok(cert) => cert,
         Err(err) => {
